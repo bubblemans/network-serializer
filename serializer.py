@@ -209,13 +209,19 @@ def calculateStringOfFormatCharacters(inBitCount):
         raise ValueError('Number of bytes from bit fields do not fit evenly into a single datatype')
 
 def preprocessFormatToAddStrings(inString, inArgs):
+    '''
+    # preprocesses both the format string and arguments to change 't' characters in serializer to valid 's' characters in struct
+    # replaces 't' with the proper length 's', and replaces the string args with bytes args
+    # returns a tuple of the processed format string and processed args
+    '''
+
     currentString = inString
     currentArgs = inArgs
-    rightIndex = currentString.find('t')
-    while rightIndex != -1:
-        argsToSkip = countNumberOfFieldsInFormatString(currentString[:rightIndex])
-        sizeOfString = len(currentArgs[argsToSkip])
-        currentArgs[argsToSkip] = bytes(currentArgs[argsToSkip], 'utf-8')
-        currentString = currentString.replace('t', str(sizeOfString) + 's', 1)
-        rightIndex = currentString.find('t')
+    rightIndex = currentString.find('t') # looks for the first 't' to prime the loop
+    while rightIndex != -1: # until we run out of 't's to find
+        argsToSkip = countNumberOfFieldsInFormatString(currentString[:rightIndex]) # figure out how many args we need to skip to get to the right string arg
+        sizeOfString = len(currentArgs[argsToSkip]) # determine the size of that string before we convert it to bytes
+        currentArgs[argsToSkip] = bytes(currentArgs[argsToSkip], 'utf-8') # convert it to bytes using utf-8, the standard encoding done by chr.encode()
+        currentString = currentString.replace('t', str(sizeOfString) + 's', 1) # replace the 't' we just found with an 's' with the proper length in front of it
+        rightIndex = currentString.find('t') # prime the loop again
     return (currentString, currentArgs)
