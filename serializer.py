@@ -89,8 +89,9 @@ class Encoder(OrderedDict):
         # returns a stream of bytes
         '''
 
-        currentString = self.fmt # holds the variable string; shrinks whenever findFirstBitInFormatString() is run on it
-        currentArgs = list(self.values()) # holds the args tuple; shrinks after every struct.pack() call
+        (originalString, originalArgs) = preprocessFormatToAddStrings(self.fmt, list(self.values())) # replaces 't' characters with 's' character with the right length and changes strings to bytes
+        currentString = originalString # holds the variable string; shrinks whenever findFirstBitInFormatString() is run on it
+        currentArgs = originalArgs # holds the args tuple; shrinks after every struct.pack() call
         isBigEndian = False # for adding an '!' to every string but the first leftString if the format string starts with an '!'
         byteStream = bytearray() # the return value; a stream of bytes
         bitCount = 0 # holds the number of bits currently in use; makes sure all bits fit nicely into bytes before letting struct.pack() run on anything
@@ -105,7 +106,7 @@ class Encoder(OrderedDict):
         (leftString, bitString, currentString) = findFirstBitInFormatString(currentString)
 
         # if string remains the same, then we don't need to do anything extra
-        if currentString == self.fmt:
+        if currentString == originalString:
             return byteStream + struct.pack(currentString, *currentArgs)
             
         # loop ends if there are no more 'u's
@@ -283,3 +284,15 @@ def calculateStringOfFormatCharacters(inBitCount):
         return STRUCT_PACK_DATA_TYPES[2]
     else:
         raise ValueError('Number of bytes from bit fields do not fit evenly into a single datatype')
+
+def preprocessFormatToAddStrings(inString, inArgs):
+    currentString = inString
+    currentArgs = inArgs
+    rightIndex = currentString.find('t')
+    while rightIndex != -1:
+        argsToSkip = countNumberOfFieldsInFormatString(currentString[:rightIndex])
+        sizeOfString = len(currentArgs[argsToSkip])
+        currentArgs[argsToSkip] = bytes(currentArgs[argsToSkip], 'utf-8')
+        currentString = currentString.replace('t', str(sizeOfString) + 's', 1)
+        rightIndex = currentString.find('t')
+    return (currentString, currentArgs)
