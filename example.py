@@ -3,12 +3,9 @@ from serializer import Encoder, Decoder, _parse_fmt
 
 
 if __name__ == '__main__':
-    encoder = Encoder(fmt='!6H', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0)
-
-    # serializer is a dict
-    print(encoder)
-
     # behave like a dict
+    encoder = Encoder(fmt='!6H', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0)
+    print(encoder)
     encoder['id'] = 18
     print('id:', encoder['id'])
 
@@ -24,13 +21,25 @@ if __name__ == '__main__':
     # encode DNS req
     print()
     print('--- Test DNS Request ---')
-    header = Encoder(fmt='!HHHHHH', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0).encode()
-    question_name = Encoder(fmt='!BtBtB', ch_length_1=6, domain_name_1='google', ch_length_2=3, domain_name_2='com', delimiter=0).encode()
-    question_type = Encoder(fmt='!H', Q_TYPE=1).encode()
-    question_class = Encoder(fmt='!H', Q_CLASS=1).encode()
-    query = question_name + question_type + question_class
-    request = header + query
-    print(request)
+    encoder = Encoder(
+        fmt='!HHHHHHBtBtBHH',
+        id=17,
+        flags=1 << 8,
+        QDCOUNT=1,
+        ANCOUNT=0,
+        NSCOUNT=0,
+        ARCOUNT=0,
+        ch_length_1=6,
+        domain_name_1='google',
+        ch_length_2=3,
+        domain_name_2='com',
+        delimiter=0,
+        Q_TYPE=1,
+        Q_CLASS=1
+    )
+    request = encoder.encode()
+    print('Raw Request:', encoder)
+    print('Encoded Request:', request)
     print('--- End Test DNS Request ---')
 
     # decode DNS res
@@ -42,24 +51,24 @@ if __name__ == '__main__':
     sd.connect((host, port))
     sd.send(request)
     raw_response = sd.recv(1024)
-    print(raw_response)
-    print(Decoder(fmt='2Bb4bbbbbbbb4b2B2B2B2B16B16B', data=raw_response).decode(
-        'Transaction ID',
-        'Response',
-        'Opcode',
-        'Authoritative',
-        'Truncated',
-        'Recursion desired',
-        'Recursion available',
-        'Z',
-        'Answer authenticated',
-        'Non-authenticated',
-        'Reply code',
-        'Questions',
-        'Answer RRs',
-        'Authority RRs',
-        'Additional RRs',
-        'Queries',
-        'Answers'
-    ))
+    print('Raw Response:', raw_response)
+    print('Decoded Response:', Decoder(
+        TransactionID='2B',
+        Response='b',
+        Opcode='4b',
+        Authoritative='b',
+        Truncated='b',
+        RecursionDesired='b',
+        RecursionAvailable='b',
+        Z='b',
+        AnswerAuthenticated='b',
+        NonAuthenticated='b',
+        ReplyCode='4b',
+        Questions='2B',
+        AnswerRRs='2B',
+        AuthorityRRs='2B',
+        AdditionalRRs='2B',
+        Queries='16B',
+        Answers='16B'
+    ).decode(data=raw_response))
     print('--- End Test DNS Response ---')

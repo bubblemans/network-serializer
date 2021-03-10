@@ -17,11 +17,6 @@ def _parse_fmt(fmt):
 
 def _extract_format(fmt):
     """
-    [summary]
-
-    Args:
-        fmt ([type]): [description]
-
     Returns:
         a list of tuples: each tuple is a
         ex: [('H', 6)]
@@ -47,9 +42,6 @@ class Encoder(OrderedDict):
         u: 1 bit
         o: 4 bits
         t: pack each character as 4-bit hex
-
-        Returns:
-            [type]: [description]
         """
         data = bytearray()
         order = self.fmt[0]
@@ -63,50 +55,45 @@ class Encoder(OrderedDict):
 
 
 class Decoder(OrderedDict):
-    def __init__(self, fmt, data, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         B: bytes
         b: bits
-
-        Args:
-            fmt ([type]): [description]
-            data ([type]): [description]
         """
         super(Decoder, self).__init__(*args, **kwargs)
-        self.fmt = fmt
-        self.data = data
 
-    def decode(self, *args, **kwargs):
-        """
-        [summary]
-        """
-        data = self._extract_data()
+    def decode(self, data):
+        decoded = dict()
+        start_bytes = start_bits = 0
+        for field_name, fmt in self.items():
+            ch, num = _extract_format(fmt)[0]
 
-        for field_name, value in zip(args, data):
-            self[field_name] = value
-
-        return self
-
-    def _extract_data(self):
-        data = []
-        correspond_fmt = _extract_format(self.fmt)
-        start = 0
-        start_bits = 0
-        for ch, num in correspond_fmt:
             if ch == 'B':
-                data.append(self.data[start:start+num])
-                start += num
+                start, end = start_bytes, start_bytes+num
+                decoded[field_name] = data[start:end]
+                start_bytes += num
             elif ch == 'b':
-                num_bytes = num // 8  # 8 bits = 1 byte
-                data_in_byte = self.data[start:start+num_bytes+1]
-                bits = ''
-                for byte in data_in_byte:
-                    bits += format(byte, '08b')
-                data.append('0b' + bits[start_bits:start_bits+num])
+                data_in_byte = self.extract_byte(num, start_bytes, data)
+
+                # calculate bits from extracted byte
+                bits = self.bytes_to_bits(data_in_byte)
+                start, end = start_bits, start_bits+num
+                decoded[field_name] = '0b' + bits[start:end]
                 start_bits += num
 
+                # check if each bit in extracted byte is used
                 if start_bits >= 8:
-                    start += (start_bits // 8)
+                    start_bytes += (start_bits // 8)
                     start_bits = 0
+        return decoded
 
-        return data
+    def extract_byte(self, num, start, data):
+        num_bytes = num // 8  # 8 bits = 1 byte
+        end = start + num_bytes + 1
+        return data[start:end]
+
+    def bytes_to_bits(self, data):
+        bits = ''
+        for byte in data:
+            bits += format(byte, '08b')
+        return bits
