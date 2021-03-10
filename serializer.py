@@ -45,13 +45,37 @@ class Encoder(OrderedDict):
         """
         data = bytearray()
         order = self.fmt[0]
+        bit_buffer = ''
+
         for fmt, value in zip(self.fmt[1:], self.values()):
-            if fmt == 't':
+            if fmt == 'u':
+                bit_buffer += str(value)
+            elif fmt == 'o':
+                bit_buffer += str(value) * 4
+            elif fmt == 't':
                 for ch in value:
                     data += ch.encode()
             else:
                 data += struct.pack(order + fmt, value)
+
+            if len(bit_buffer) >= 8:
+                data += self.bits_to_bytes(bit_buffer)
+                bit_buffer = bit_buffer[8:]
+
         return data
+
+    def bits_to_bytes(self, bits):
+
+        def _bits_to_int(bits):
+            integer = 0
+            for i in range(len(bits)):
+                factor = len(bits) - i - 1
+                integer += int(bits[i]) * (2 ** factor)
+
+            return integer
+
+        integer = _bits_to_int(bits)
+        return struct.pack('!B', integer)
 
 
 class Decoder(OrderedDict):
