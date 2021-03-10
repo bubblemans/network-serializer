@@ -108,7 +108,7 @@ Decoder(*k1=v1*, *k2=v2*, *...*).**decode**(data)
 
 &nbsp;&nbsp;&nbsp;&nbsp;return a new dictionary in which each field name, *k1*, *k2*, *...*, has a string of bits or a bytearray following the format, *v1*, *v2*, *...* from a bytearray or byte-like object, *data*.
 
-Please see the [example](https://github.com/bubblemans/network-serializer/blob/main/example.py) which simulates a DNS client.
+***Please see the [example](https://github.com/bubblemans/network-serializer/blob/main/example.py) which simulates a DNS client.***
 
 ## Future work
 We are going to release this module on [pypi](https://pypi.org/).
