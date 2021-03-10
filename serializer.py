@@ -41,7 +41,7 @@ class Encoder(OrderedDict):
         """
         u: 1 bit
         o: 4 bits
-        t: pack each character as 4-bit hex
+        t: pack each character as 1-byte hex
         """
         data = bytearray()
         order = self.fmt[0]

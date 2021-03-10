@@ -8,6 +8,7 @@ if __name__ == '__main__':
     print(encoder)
     encoder['id'] = 18
     print('id:', encoder['id'])
+    print(encoder)
 
     # test _parse_format
     print()
