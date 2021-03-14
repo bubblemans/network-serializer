@@ -1,5 +1,5 @@
 import socket
-from serializer import Encoder, Decoder, _parse_fmt
+from network_serializer import Encoder, Decoder
 
 
 if __name__ == '__main__':
@@ -9,15 +9,6 @@ if __name__ == '__main__':
     encoder['id'] = 18
     print('id:', encoder['id'])
     print(encoder)
-
-    # test _parse_format
-    print()
-    print('--- Test _parse_format ---')
-    print(_parse_fmt('!2H'))
-    print(_parse_fmt('!H'))
-    print(_parse_fmt('!2H2H'))
-    print(_parse_fmt('!HH'))
-    print('--- End Test _parse_format ---')
 
     # encode DNS req
     print()

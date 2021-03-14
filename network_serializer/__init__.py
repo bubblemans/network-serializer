@@ -1,1 +1,1 @@
-from network-serializer.network-serializer import Encoder, Decoder
+from network_serializer.network_serializer import Encoder, Decoder
