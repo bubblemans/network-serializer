@@ -2,13 +2,13 @@ from distutils.core import setup
 setup(
   name = 'network-serializer',
   packages = ['network-serializer'],
-  version = '0.3',
+  version = '0.4',
   license='MIT',
   description = 'A Python module to help encode and decode network packets.',
   author = 'Alvin Lin',
   author_email = 'hungyeh.alvin.lin@gmail.com',
   url = 'https://github.com/bubblemans/network-serializer',
-  download_url = 'https://github.com/bubblemans/network-serializer/archive/v0.3.tar.gz',
+  download_url = 'https://github.com/bubblemans/network-serializer/archive/v0.4.tar.gz',
   keywords = ['network', 'serilize', 'serializer', 'encode', 'decode', 'packet'],
   install_requires=[],
   classifiers=[
