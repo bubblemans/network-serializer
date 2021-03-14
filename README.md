@@ -114,9 +114,6 @@ Decoder(*k1=v1*, *k2=v2*, *...*).**decode**(data)
 
 ***Please see the [example](https://github.com/bubblemans/network-serializer/blob/main/example.py) which simulates a DNS client.***
 
-## Future work
-We are going to release this module on [pypi](https://pypi.org/).
-
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
