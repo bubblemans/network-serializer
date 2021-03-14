@@ -2,53 +2,85 @@ import struct
 from collections import OrderedDict
 
 
-class Serializer(OrderedDict):
-    def __init__(self, fmt='', encoding='', *args, **kwargs):
-        super(Serializer, self).__init__(*args, **kwargs)
+def _parse_fmt(fmt):
+        """
+        this function converts user-input format into a more processable string
+        ex: !2H -> !HH
+        """
+        new_fmt = fmt[0]
+        correspond_fmt = _extract_format(fmt[1:])
+        for ch, times in correspond_fmt:
+            new_fmt += (ch * times)
+
+        return new_fmt
+
+
+def _extract_format(fmt):
+    """
+    Returns:
+        a list of tuples: each tuple is a
+        ex: [('H', 6)]
+    """
+    correspond_fmt = []
+    start = 0
+    for i, ch in enumerate(fmt):
+        if not ch.isdigit():
+            end = i
+            times = int(fmt[start:end]) if start != end else 1
+            correspond_fmt.append((ch, times))
+            start = end + 1
+    return correspond_fmt
+
+
+class Encoder(OrderedDict):
+    def __init__(self, fmt='', *args, **kwargs):
+        super(Encoder, self).__init__(*args, **kwargs)
         self.fmt = fmt
-        # self._parse_fmt()
-        self.encoding = encoding
 
     def encode(self):
         """
         u: 1 bit
         o: 4 bits
-        t: pack each character as 4-bit hex
-
-        Returns:
-            [type]: [description]
+        t: pack each character as 1-byte hex
         """
+        parsedfmt = _parse_fmt(self.fmt)
         data = bytearray()
-        order = ''
-        if self.fmt[0] == '>' or self.fmt[0] == '!': # if order is big endian, we save it; otherwise we leave it to the default little endian
-            order = self.fmt[0]
-        for fmt, value in zip(self.fmt[1:], self.values()):
-            if fmt == 't':
+        order = self.fmt[0]
+        bit_buffer = ''
+        for fmt, value in zip(parsedfmt[1:], self.values()):
+            if fmt == 'u':
+                bit_buffer += str(value)
+            elif fmt == 'o':
+                bit_buffer += str(value) * 4
+            elif fmt == 't':
                 for ch in value:
                     data += ch.encode()
             else:
                 data += struct.pack(order + fmt, value)
+
+            if len(bit_buffer) >= 8:
+                data += self.bits_to_bytes(bit_buffer)
+                bit_buffer = bit_buffer[8:]
+
         return data
 
-    def _parse_fmt(self):
-        """
-        this function converts user-input format into a more processable string
-        ex: !2H -> !HH
-        """
-        fmt = self.fmt[0]
+    def bits_to_bytes(self, bits):
 
-        start = 1
-        for i, ch in enumerate(self.fmt[1:]):
-            if not ch.isdigit():
-                fmt += (ch * int(self.fmt[start:i+1]))
-                start = i + 1
+        def _bits_to_int(bits):
+            integer = 0
+            for i in range(len(bits)):
+                factor = len(bits) - i - 1
+                integer += int(bits[i]) * (2 ** factor)
 
-        self.fmt = fmt
-        return fmt
+            return integer
 
+        integer = _bits_to_int(bits)
+        return struct.pack('!B', integer)
+
+    # exist to solve an issue with IP packets; since encode() can't handle bit fields that aren't 1 bit or 4 bits long
     def alt_encode (self):
         '''
-        # alternate version of the main function of serializer 
+        # alternate version of the main function of serializer that works better with fields of irregular bit sizes
         # expands on struct.pack, allowing for fields smaller than a byte to be represented with the letter 'u'
         #
         # NOTE: current version only supports 'u', not 'o' or 't'
@@ -85,6 +117,7 @@ class Serializer(OrderedDict):
                     if bitCount % 8 == 0: # bit fields must fit evenly into bytes; otherwise we can't put them into bytes for the byte stream
                         dataType = calculateStringOfFormatCharacters(bitCount) # first we calculate the format string
                         #TODO: Allow this to handle multiple format characters
+                        print(currentBitFieldsValue)
                         byteStream += struct.pack(endiannessCharacter + dataType, currentBitFieldsValue) # only passes in one field and one argument
                         bitCount = 0 # resets since we just passed in the current bit fields
                         currentBitFieldsValue = 0 # resets since we just passed in the arg
@@ -120,11 +153,56 @@ class Serializer(OrderedDict):
                 currentBitFieldsValue = 0
             else:
                 raise ValueError('Bit fields do not divide evenly into bytes')
-
         byteStream += struct.pack(endiannessCharacter + currentString, *currentArgs) # since we left the loop because there's no more 'u's in the string, just pass the remaining string to struct.pack()
 
         return byteStream # finally, return the byte stream
 
+
+class Decoder(OrderedDict):
+    def __init__(self, *args, **kwargs):
+        """
+        B: bytes
+        b: bits
+        """
+        super(Decoder, self).__init__(*args, **kwargs)
+
+    def decode(self, data):
+        decoded = dict()
+        start_bytes = start_bits = 0
+        for field_name, fmt in self.items():
+            ch, num = _extract_format(fmt)[0]
+
+            if ch == 'B':
+                start, end = start_bytes, start_bytes+num
+                decoded[field_name] = data[start:end]
+                start_bytes += num
+            elif ch == 'b':
+                data_in_byte = self.extract_byte(num, start_bytes, data)
+
+                # calculate bits from extracted byte
+                bits = self.bytes_to_bits(data_in_byte)
+                start, end = start_bits, start_bits+num
+                decoded[field_name] = '0b' + bits[start:end]
+                start_bits += num
+
+                # check if each bit in extracted byte is used
+                if start_bits >= 8:
+                    start_bytes += (start_bits // 8)
+                    start_bits = 0
+        return decoded
+
+    def extract_byte(self, num, start, data):
+        num_bytes = num // 8  # 8 bits = 1 byte
+        end = start + num_bytes + 1
+        return data[start:end]
+
+    def bytes_to_bits(self, data):
+        bits = ''
+        for byte in data:
+            bits += format(byte, '08b')
+        return bits
+
+# functions used for alt_encode()
 def findNumberAtFrontOfString(stringWithNumberAtFront):
     '''
     # counts the number at the front of a string, stopping when it hits anything that's not a digit
@@ -144,7 +222,6 @@ def countNumberOfFieldsInFormatString(inString):
     # counts the number of fields in the input string to know how many args to pass to struct.pack()
     # returns that count
     '''
-
     count = 0
     subcount = 0
     wasLastCharANum = False
@@ -154,7 +231,7 @@ def countNumberOfFieldsInFormatString(inString):
                 subcount *= 10
                 subcount += int(character)
                 wasLastCharANum = True
-            elif character != 's' or character != 'F': # if it's 's' or 'u', the number in front doesn't change the number of fields, so reset the sub count and increment the count
+            elif character == 's' or character == 'u': # if it's 's' or 'u', the number in front doesn't change the number of fields, so reset the sub count and increment the count
                 count += 1
                 subcount = 0
                 wasLastCharANum = False
@@ -181,10 +258,10 @@ def findFirstBitInFormatString(inString):
             leftIndex -= 1
     else:
         return ("", "", currentString)
-    
+
     # splits input string into three strings:
     #   * the string prior to the split string
-    #   * the split string, which contains the 'F' character along with an optional immediately preceding number
+    #   * the split string, which contains the 'u' character along with an optional immediately preceding number
     #   * the remainder of the string
     return (currentString[:leftIndex], currentString[leftIndex:rightIndex+1], currentString[rightIndex+1:])
 
