@@ -1,31 +1,84 @@
-from serializer import Serializer
+import socket
+from serializer import Encoder, Decoder, _parse_fmt
 
 
 if __name__ == '__main__':
-    serializer = Serializer(fmt='!6H', encoding='dec', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0)
-
-    # serializer is a dict
-    print(serializer)
-
     # behave like a dict
-    serializer['id'] = 18
-    print('id:', serializer['id'])
+    encoder = Encoder(fmt='!6H', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0)
+    print(encoder)
+    encoder['id'] = 18
+    print('id:', encoder['id'])
+    print(encoder)
 
     # test _parse_format
-    print(Serializer(fmt='!2H', encoding='dec', id=17, flags=1 << 8)._parse_fmt())
+    print()
+    print('--- Test _parse_format ---')
+    print(_parse_fmt('!2H'))
+    print(_parse_fmt('!H'))
+    print(_parse_fmt('!2H2H'))
+    print(_parse_fmt('!HH'))
+    print('--- End Test _parse_format ---')
 
-    # encode
-    header = Serializer(fmt='!HHHHHH', encoding='dec', id=17, flags=1 << 8, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0).encode()
-    question_name = Serializer(fmt='!BtBt', encoding='dec', ch_length_1=6, domain_name_1='google', ch_length_2=3, domain_name_2='com').encode()
-    question_type = Serializer(fmt='!H', encoding='dec', Q_TYPE=1).encode()
-    question_class = Serializer(fmt='!H', encoding='dec', Q_CLASS=1).encode()
-    query = question_name + question_type + question_class
+    # encode DNS req
+    print()
+    print('--- Test DNS Request ---')
+    encoder = Encoder(
+        fmt='!Huo7uoHHHHBtBtBHH',
+        id=17,
+        Response=0,
+        Opcode=0,
+        AA=0,
+        Truncated=0,
+        RecursionDesired=1,
+        RA=0,
+        Z=0,
+        Dummy_1=0,
+        NonAuthenticated=0,
+        RCODE=0,
+        QDCOUNT=1,
+        ANCOUNT=0,
+        NSCOUNT=0,
+        ARCOUNT=0,
+        domain_name_1_length=6,
+        domain_name_1='google',
+        domain_name_2_length=3,
+        domain_name_2='com',
+        delimiter=0,
+        Q_TYPE=1,
+        Q_CLASS=1
+    )
+    request = encoder.encode()
+    print('Raw Request:', encoder)
+    print('Encoded Request:', request)
+    print('--- End Test DNS Request ---')
 
-    header_alt = Serializer(fmt='!Hu4uuuuu3u4uHHHH', encoding='dec', id=17, QUERY=0, OPCODE=0, AA=0, TRUNCATION=0, RECURSION_DESIRED=1, RECURSION_AVAILABLE=0, Z=0, RCODE=0, QDCOUNT=1, ANCOUNT=0, NSCOUNT=0, ARCOUNT=0).alt_encode()
-    question_name_alt = Serializer(fmt='!BtBt', encoding='dec', ch_length_1=6, domain_name_1='google', ch_length_2=3, domain_name_2='com').alt_encode()
-    question_type_alt = Serializer(fmt='!H', encoding='dec', Q_TYPE=1).alt_encode()
-    question_class_alt = Serializer(fmt='!H', encoding='dec', Q_CLASS=1).alt_encode()
-    query_alt = question_name_alt + question_type_alt + question_class_alt
-
-    print(header + query)
-    print(header_alt + query_alt)
+    # decode DNS res
+    print()
+    print('--- Test DNS Response ---')
+    sd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    host = '8.8.8.8'
+    port = 53
+    sd.connect((host, port))
+    sd.send(request)
+    raw_response = sd.recv(1024)
+    print('Raw Response:', raw_response)
+    print('Decoded Response:', Decoder(
+        TransactionID='2B',
+        Response='b',
+        Opcode='4b',
+        Authoritative='b',
+        Truncated='b',
+        RecursionDesired='b',
+        RecursionAvailable='b',
+        Z='b',
+        AnswerAuthenticated='b',
+        NonAuthenticated='b',
+        ReplyCode='4b',
+        Questions='2B',
+        AnswerRRs='2B',
+        AuthorityRRs='2B',
+        AdditionalRRs='2B',
+        Queries='16B',
+        Answers='16B'
+    ).decode(data=raw_response))
+    print('--- End Test DNS Response ---')
