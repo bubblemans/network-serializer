@@ -1,16 +1,20 @@
 # network-serializer
 network-serializer is the simplest, the most readable, and the most feasible serializer for networking packets.
 
+- Simplicity: organize packets as easy as *struct*
+- Readability: byte data is recognized by field names
+- Feasibility: change field names or byte data any time and anywhere
+- Supportability: support not only byte-like data but also bit-like data
+
 ## Installation
 ```bash
-git clone https://github.com/bubblemans/network-serializer.git
-cd network-serializer
-virtualenv env
-source env/bin/activate
-pip install -r requirements.txt
+pip install network-serializer
 ```
 
 ## Usage
+```python
+from network_serializer import Encoder, Decoder
+```
 
 ### Encoder
 You can use Encoder to convert decimal data to bytearray data. Encoder follows the rule of python built-in module [struct](https://docs.python.org/3/library/struct.html) with additional functionalities.
@@ -28,7 +32,7 @@ Notes:
 2. One of more characters will be encoded into 4-bit hex value. For example, a character, 'g', will be encoded into 0x67. Please see [ascii table](http://www.asciitable.com/) for conversion.
 
 ```python
->>> Encoder(fmt='!H', id=1).decode()
+>>> Encoder(fmt='!H', id=1).encode()
 bytearray(b'\x00\x01')
 ```
 
