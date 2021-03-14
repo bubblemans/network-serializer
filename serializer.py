@@ -35,7 +35,7 @@ def _extract_format(fmt):
 class Encoder(OrderedDict):
     def __init__(self, fmt='', *args, **kwargs):
         super(Encoder, self).__init__(*args, **kwargs)
-        self.fmt = _parse_fmt(fmt)
+        self.fmt = fmt
 
     def encode(self):
         """
@@ -43,11 +43,11 @@ class Encoder(OrderedDict):
         o: 4 bits
         t: pack each character as 1-byte hex
         """
+        parsedfmt = _parse_fmt(self.fmt)
         data = bytearray()
         order = self.fmt[0]
         bit_buffer = ''
-
-        for fmt, value in zip(self.fmt[1:], self.values()):
+        for fmt, value in zip(parsedfmt[1:], self.values()):
             if fmt == 'u':
                 bit_buffer += str(value)
             elif fmt == 'o':
@@ -77,9 +77,10 @@ class Encoder(OrderedDict):
         integer = _bits_to_int(bits)
         return struct.pack('!B', integer)
 
+    # exist to solve an issue with IP packets; since encode() can't handle bit fields that aren't 1 bit or 4 bits long
     def alt_encode (self):
         '''
-        # alternate version of the main function of serializer 
+        # alternate version of the main function of serializer that works better with fields of irregular bit sizes
         # expands on struct.pack, allowing for fields smaller than a byte to be represented with the letter 'u'
         #
         # NOTE: current version only supports 'u', not 'o' or 't'
@@ -116,6 +117,7 @@ class Encoder(OrderedDict):
                     if bitCount % 8 == 0: # bit fields must fit evenly into bytes; otherwise we can't put them into bytes for the byte stream
                         dataType = calculateStringOfFormatCharacters(bitCount) # first we calculate the format string
                         #TODO: Allow this to handle multiple format characters
+                        print(currentBitFieldsValue)
                         byteStream += struct.pack(endiannessCharacter + dataType, currentBitFieldsValue) # only passes in one field and one argument
                         bitCount = 0 # resets since we just passed in the current bit fields
                         currentBitFieldsValue = 0 # resets since we just passed in the arg
@@ -151,7 +153,6 @@ class Encoder(OrderedDict):
                 currentBitFieldsValue = 0
             else:
                 raise ValueError('Bit fields do not divide evenly into bytes')
-
         byteStream += struct.pack(endiannessCharacter + currentString, *currentArgs) # since we left the loop because there's no more 'u's in the string, just pass the remaining string to struct.pack()
 
         return byteStream # finally, return the byte stream
@@ -201,7 +202,7 @@ class Decoder(OrderedDict):
             bits += format(byte, '08b')
         return bits
 
-
+# functions used for alt_encode()
 def findNumberAtFrontOfString(stringWithNumberAtFront):
     '''
     # counts the number at the front of a string, stopping when it hits anything that's not a digit
@@ -221,7 +222,6 @@ def countNumberOfFieldsInFormatString(inString):
     # counts the number of fields in the input string to know how many args to pass to struct.pack()
     # returns that count
     '''
-
     count = 0
     subcount = 0
     wasLastCharANum = False
@@ -231,7 +231,7 @@ def countNumberOfFieldsInFormatString(inString):
                 subcount *= 10
                 subcount += int(character)
                 wasLastCharANum = True
-            elif character != 's' or character != 'F': # if it's 's' or 'u', the number in front doesn't change the number of fields, so reset the sub count and increment the count
+            elif character == 's' or character == 'u': # if it's 's' or 'u', the number in front doesn't change the number of fields, so reset the sub count and increment the count
                 count += 1
                 subcount = 0
                 wasLastCharANum = False
@@ -258,10 +258,10 @@ def findFirstBitInFormatString(inString):
             leftIndex -= 1
     else:
         return ("", "", currentString)
-    
+
     # splits input string into three strings:
     #   * the string prior to the split string
-    #   * the split string, which contains the 'F' character along with an optional immediately preceding number
+    #   * the split string, which contains the 'u' character along with an optional immediately preceding number
     #   * the remainder of the string
     return (currentString[:leftIndex], currentString[leftIndex:rightIndex+1], currentString[rightIndex+1:])
 
